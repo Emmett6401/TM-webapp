@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webcam Image Classification with ml5.js</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        #p5-canvas {
+            border: 2px solid #ccc;
+            border-radius: 8px;
+        }
+
+        #label-container {
+            margin-top: 1rem;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #555;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>이미지 분류기</h1>
+        <div id="p5-canvas"></div>
+        <div id="label-container">모델을 로딩 중입니다...</div>
+    </div>
+
+    <script>
+        // Classifier Variable
+        let classifier;
+        // Model URL
+        let imageModelURL = 'https://teachablemachine.withgoogle.com/models/bXy2kDNi/';
+        
+        // Video
+        let video;
+        // To store the classification
+        let label = "";
+
+        // Load the model first
+        function preload() {
+            // 'model.json' 파일을 로드하여 이미지 분류기를 생성합니다.
+            classifier = ml5.imageClassifier(imageModelURL + 'model.json');
+        }
+
+        function setup() {
+            // 캔버스를 생성하고 HTML의 'p5-canvas' div 안에 배치합니다.
+            const canvas = createCanvas(320, 260);
+            canvas.parent('p5-canvas');
+            
+            // 웹캠 비디오를 생성합니다. 최신 ml5.js는 자동으로 비디오를 좌우 반전시켜 줍니다.
+            video = createCapture(VIDEO);
+            video.size(320, 240);
+            video.hide();
+            
+            // 비디오가 준비되면 분류를 시작합니다.
+            video.elt.onloadeddata = () => {
+                console.log("Video is ready!");
+                classifyVideo();
+            };
+        }
+
+        function draw() {
+            background(0);
+            // 비디오 프레임을 캔버스에 그립니다.
+            image(video, 0, 0);
+
+            // 예측된 라벨을 캔버스 아래에 표시합니다.
+            fill(255);
+            textSize(16);
+            textAlign(CENTER);
+            text(label, width / 2, height - 4);
+        }
+
+        // 현재 비디오 프레임에 대한 예측을 얻습니다.
+        function classifyVideo() {
+            // 'flippedVideo' 대신 'video'를 직접 사용하여 분류합니다.
+            classifier.classify(video, gotResult);
+        }
+
+        // 예측 결과를 받으면 호출되는 콜백 함수입니다.
+        function gotResult(error, results) {
+            // 에러가 있다면 콘솔에 출력하고 함수를 종료합니다.
+            if (error) {
+                console.error(error);
+                return;
+            }
+            
+            // 결과는 신뢰도(confidence) 순으로 배열에 담겨 있습니다.
+            // 가장 신뢰도가 높은 첫 번째 라벨을 가져옵니다.
+            label = results[0].label;
+            
+            // 텍스트를 업데이트합니다.
+            document.getElementById('label-container').innerText = `결과: ${label}`;
+
+            // 다음 예측을 위해 classifyVideo() 함수를 다시 호출합니다.
+            classifyVideo();
+        }
+    </script>
+</body>
+</html>
