@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Webcam Image Classification with ml5.js</title>
+    <title>웹캠 이미지 분류기</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
@@ -13,47 +13,93 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
+            background-color: #f0f4f8;
             font-family: 'Inter', sans-serif;
+            color: #334e68;
         }
 
         .container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 2rem;
+            padding: 2.5rem;
             background-color: #ffffff;
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        h1 {
-            color: #333;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        #p5-canvas {
-            border: 2px solid #ccc;
-            border-radius: 8px;
-        }
-
-        #label-container {
-            margin-top: 1rem;
-            font-size: 1.25rem;
-            font-weight: bold;
-            color: #555;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
             text-align: center;
         }
 
+        h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        p.subtitle {
+            font-size: 1rem;
+            color: #6b7c93;
+            margin-bottom: 1.5rem;
+        }
+
+        #p5-canvas {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #000;
+            display: block;
+        }
+
+        #status-container {
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        #loading-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        #loading-bar-wrapper {
+            width: 100%;
+            height: 20px;
+            background-color: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #loading-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #38bdf8;
+            transition: width 0.3s ease-in-out;
+            border-radius: 10px;
+        }
+
+        #label-container {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 1.5rem;
+            color: #2a4365;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>이미지 분류기</h1>
+        <h1>웹캠 이미지 분류기</h1>
+        <p class="subtitle">Teachable Machine 모델을 사용해 물체를 분류합니다.</p>
+
         <div id="p5-canvas"></div>
-        <div id="label-container">모델을 로딩 중입니다...</div>
+        
+        <div id="status-container">
+            <div id="loading-text">모델을 로딩 중입니다...</div>
+            <div id="loading-bar-wrapper">
+                <div id="loading-bar"></div>
+            </div>
+            <div id="label-container"></div>
+        </div>
     </div>
 
     <script>
@@ -67,10 +113,32 @@
         // To store the classification
         let label = "";
 
+        // UI 요소
+        let loadingText;
+        let loadingBar;
+        let labelContainer;
+
         // Load the model first
         function preload() {
+            // UI 요소들을 가져옵니다.
+            loadingText = document.getElementById('loading-text');
+            loadingBar = document.getElementById('loading-bar');
+            labelContainer = document.getElementById('label-container');
+
+            // 모델 로딩 진행 상황을 추적하기 위한 옵션
+            const options = {
+                onProgress: (state) => {
+                    // ml5.js가 제공하는 로딩 상태를 사용해 진행률을 업데이트합니다.
+                    if (state.status === 'downloading-model') {
+                        const percent = Math.floor(state.progress * 100);
+                        loadingText.innerText = `모델 로딩 중... ${percent}%`;
+                        loadingBar.style.width = `${percent}%`;
+                    }
+                }
+            };
+
             // 'model.json' 파일을 로드하여 이미지 분류기를 생성합니다.
-            classifier = ml5.imageClassifier(imageModelURL + 'model.json');
+            classifier = ml5.imageClassifier(imageModelURL + 'model.json', options, modelReady);
         }
 
         function setup() {
@@ -78,33 +146,42 @@
             const canvas = createCanvas(320, 260);
             canvas.parent('p5-canvas');
             
-            // 웹캠 비디오를 생성합니다. 최신 ml5.js는 자동으로 비디오를 좌우 반전시켜 줍니다.
+            // 웹캠 비디오를 생성합니다.
             video = createCapture(VIDEO);
             video.size(320, 240);
             video.hide();
+        }
+
+        function draw() {
+            // 비디오가 준비되었을 때만 그립니다.
+            if (video && video.ready) {
+                background(0);
+                // 비디오 프레임을 캔버스에 그립니다.
+                image(video, 0, 0);
+
+                // 예측된 라벨을 캔버스 아래에 표시합니다.
+                fill(255);
+                textSize(16);
+                textAlign(CENTER);
+                text(label, width / 2, height - 4);
+            }
+        }
+
+        // 모델이 준비되면 호출됩니다.
+        function modelReady() {
+            console.log("Model is ready!");
+            loadingText.innerText = '모델 로딩 완료!';
+            loadingBar.style.width = '100%';
             
-            // 비디오가 준비되면 분류를 시작합니다.
+            // 비디오가 완전히 로드되면 분류를 시작합니다.
             video.elt.onloadeddata = () => {
                 console.log("Video is ready!");
                 classifyVideo();
             };
         }
 
-        function draw() {
-            background(0);
-            // 비디오 프레임을 캔버스에 그립니다.
-            image(video, 0, 0);
-
-            // 예측된 라벨을 캔버스 아래에 표시합니다.
-            fill(255);
-            textSize(16);
-            textAlign(CENTER);
-            text(label, width / 2, height - 4);
-        }
-
         // 현재 비디오 프레임에 대한 예측을 얻습니다.
         function classifyVideo() {
-            // 'flippedVideo' 대신 'video'를 직접 사용하여 분류합니다.
             classifier.classify(video, gotResult);
         }
 
@@ -121,7 +198,7 @@
             label = results[0].label;
             
             // 텍스트를 업데이트합니다.
-            document.getElementById('label-container').innerText = `결과: ${label}`;
+            labelContainer.innerText = `결과: ${label}`;
 
             // 다음 예측을 위해 classifyVideo() 함수를 다시 호출합니다.
             classifyVideo();
